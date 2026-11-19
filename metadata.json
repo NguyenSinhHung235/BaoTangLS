@@ -1,0 +1,6 @@
+{
+  "name": "BẢO TÀNG LS",
+  "description": "Hồ sơ số cho 15 hiện vật tiêu biểu của Bảo tàng tỉnh Lạng Sơn — Nền tảng số hóa, quản lý, lưu trữ và tra cứu thông tin hiện vật.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

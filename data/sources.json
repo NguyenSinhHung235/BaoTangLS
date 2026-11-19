@@ -1,0 +1,57 @@
+{
+  "nguonTuLieu": [
+    {
+      "id": "TL001",
+      "tenTaiLieu": "Trang tin điện tử Bảo tàng tỉnh Lạng Sơn",
+      "coQuanPhatHanh": "Bảo tàng tỉnh Lạng Sơn",
+      "duongDanTruyCap": "https://baotanglangson.vn",
+      "loaiNguon": "Trang tin điện tử chính thống",
+      "noiDungSuDung": "Nguồn chính thống cung cấp thông tin mô tả, niên đại, kích thước và bối cảnh các hiện vật tiêu biểu của Bảo tàng tỉnh Lạng Sơn.",
+      "trangThaiXacMinh": "da_xac_minh"
+    },
+    {
+      "id": "TL002",
+      "tenTaiLieu": "Tài liệu nghiên cứu về Bia Thủy Môn Đình",
+      "coQuanPhatHanh": "Cục Di sản văn hóa",
+      "duongDanTruyCap": "https://dsvh.gov.vn",
+      "loaiNguon": "Tài liệu nghiên cứu cơ quan quản lý di sản",
+      "noiDungSuDung": "Nội dung minh văn (33 dòng, 869 chữ Hán), kích thước, niên đại và giá trị của Bảo vật quốc gia Bia Thủy Môn Đình (HS001).",
+      "trangThaiXacMinh": "da_xac_minh"
+    },
+    {
+      "id": "TL003",
+      "tenTaiLieu": "Báo Lạng Sơn và các bài viết liên quan",
+      "coQuanPhatHanh": "Báo Lạng Sơn",
+      "duongDanTruyCap": null,
+      "loaiNguon": "Báo chí và tư liệu tham khảo địa phương",
+      "noiDungSuDung": "Thông tin tham khảo về Trống đồng Na Dương (HS002), Súng thần công thế kỷ XIX (HS003) và Hóa thạch cá sấu cổ đại Na Dương (HS015).",
+      "trangThaiXacMinh": "cho_xac_minh"
+    }
+  ],
+  "quyenCongBo": [
+    {
+      "id": "Q001",
+      "tenNguoiHoacDonVi": "Gia đình bà Mông Thị Thơm (thôn Hợp Tân, xã Gia Cát, huyện Cao Lộc)",
+      "vaiTro": "Chủ sở hữu cũ / Người hiến tặng hiện vật (HS007 Háp Lỳ, HS008 Còm Lót)",
+      "ngayDongY": "2/12/2019",
+      "phamViCongBo": "Gia đình đã tặng lại hiện vật cho Bảo tàng tỉnh Lạng Sơn (đồng ý hiến tặng).",
+      "gioiHanSuDung": "Cần liên hệ Bảo tàng tỉnh Lạng Sơn để xác nhận quyền công bố hình ảnh chi tiết khi đăng tải."
+    },
+    {
+      "id": "Q002",
+      "tenNguoiHoacDonVi": null,
+      "vaiTro": "Đơn vị quản lý hiện vật và người cho phép công bố hình ảnh (các hồ sơ còn lại)",
+      "ngayDongY": null,
+      "phamViCongBo": null,
+      "gioiHanSuDung": "Hầu hết các hiện vật còn thiếu thông tin người cho phép công bố, phần không công bố và sơ đồ vị trí trưng bày cụ thể; cần liên hệ trực tiếp Bảo tàng tỉnh Lạng Sơn trước khi công bố chính thức."
+    }
+  ],
+  "nhomThucHien": [
+    {
+      "id": "TV001",
+      "hoTen": null,
+      "maSinhVien": null,
+      "vaiTro": null
+    }
+  ]
+}
