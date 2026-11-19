@@ -54,6 +54,14 @@ export function QaScreen({ geminiStatus, onSelectArtifact }: QaScreenProps) {
         body: JSON.stringify({ question: trimmed }),
       });
 
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.toLowerCase().includes('application/json')) {
+        setErrorMsg(
+          'Chức năng hỏi đáp Gemini cần máy chủ API phía sau (Express server.ts hoặc Vercel Serverless Function có cấu hình GEMINI_API_KEY). Khi chạy bản build tĩnh thuần túy, vui lòng tra cứu trực tiếp tại mục "15 Hiện vật".'
+        );
+        return;
+      }
+
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(

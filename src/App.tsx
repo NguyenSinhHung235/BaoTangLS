@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import bundledArtifactsJson from '../data/hienvat.json';
+import bundledSourcesJson from '../data/sources.json';
 import { Footer } from './components/Footer';
 import { TopBar } from './components/TopBar';
 import { AboutScreen } from './components/screens/AboutScreen';
@@ -14,39 +16,78 @@ import type {
   GeminiSystemStatus,
   ScreenId,
 } from './types/artifact';
-import { createInitial15Records } from './utils/artifactHelpers';
+import {
+  computeRecordCompletion,
+  createInitial15Records,
+} from './utils/artifactHelpers';
 
-const INITIAL_STORE: ArchiveMetadataStore = {
-  nguonTuLieu: [
-    {
-      id: 'TL001',
-      tenTaiLieu: null,
-      coQuanPhatHanh: null,
-      duongDanTruyCap: null,
-      loaiNguon: null,
-      noiDungSuDung: null,
-      trangThaiXacMinh: 'chua_co_du_lieu',
-    },
-  ],
-  quyenCongBo: [
-    {
-      id: 'Q001',
-      tenNguoiHoacDonVi: null,
-      vaiTro: null,
-      ngayDongY: null,
-      phamViCongBo: null,
-      gioiHanSuDung: null,
-    },
-  ],
-  nhomThucHien: [
-    {
-      id: 'TV001',
-      hoTen: null,
-      maSinhVien: null,
-      vaiTro: null,
-    },
-  ],
-};
+const STORAGE_ARTIFACTS_KEY = 'baotang_ls_hienvat_v1';
+const STORAGE_SOURCES_KEY = 'baotang_ls_sources_v1';
+
+const BUNDLED_RECORDS: ArtifactRecord[] = Array.isArray(
+  bundledArtifactsJson?.hoSoHienVat
+)
+  ? (bundledArtifactsJson.hoSoHienVat as ArtifactRecord[])
+  : createInitial15Records();
+
+const BUNDLED_SOURCES: ArchiveMetadataStore =
+  bundledSourcesJson as ArchiveMetadataStore;
+
+function getInitialRecords(): ArtifactRecord[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_ARTIFACTS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 15) {
+        return parsed as ArtifactRecord[];
+      }
+    }
+  } catch {
+    // Ignore localStorage parse errors
+  }
+  return BUNDLED_RECORDS;
+}
+
+function getInitialSources(): ArchiveMetadataStore {
+  try {
+    const saved = localStorage.getItem(STORAGE_SOURCES_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && Array.isArray(parsed.nguonTuLieu)) {
+        return parsed as ArchiveMetadataStore;
+      }
+    }
+  } catch {
+    // Ignore localStorage parse errors
+  }
+  return BUNDLED_SOURCES;
+}
+
+function computeStaticGeminiStatus(
+  records: ArtifactRecord[]
+): GeminiSystemStatus {
+  const activeRecords = records.filter(
+    (r) => computeRecordCompletion(r).hasAnyInput
+  );
+  const verifiedRecords = records.filter(
+    (r) =>
+      r.mucKiemChung === 'da_xac_minh' &&
+      computeRecordCompletion(r).hasAnyInput
+  );
+  return {
+    apiConfigured: false,
+    hasVerifiedData: verifiedRecords.length > 0,
+    hasAnyData: activeRecords.length > 0,
+    activeRecordsCount: activeRecords.length,
+    verifiedRecordsCount: verifiedRecords.length,
+    model: 'gemini-4-hydrogen',
+  };
+}
+
+function isJsonResponse(res: Response): boolean {
+  const ct = res.headers.get('content-type') || '';
+  return res.ok && ct.toLowerCase().includes('application/json');
+}
 
 function parseHashRoute(): { screen: ScreenId; maHoSo: string } {
   const hash = window.location.hash.replace(/^#/, '');
@@ -80,16 +121,13 @@ export default function App() {
   );
   const [manageInitialCode, setManageInitialCode] = useState<string>('HS001');
 
-  const [records, setRecords] = useState<ArtifactRecord[]>(() =>
-    createInitial15Records()
-  );
+  const [records, setRecords] = useState<ArtifactRecord[]>(getInitialRecords);
   const [sourcesStore, setSourcesStore] =
-    useState<ArchiveMetadataStore>(INITIAL_STORE);
+    useState<ArchiveMetadataStore>(getInitialSources);
   const [geminiStatus, setGeminiStatus] = useState<GeminiSystemStatus | null>(
-    null
+    () => computeStaticGeminiStatus(getInitialRecords())
   );
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   // List Screen filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,48 +138,57 @@ export default function App() {
 
   const fetchAllData = useCallback(async () => {
     try {
-      setLoadError(null);
       const [artRes, srcRes, gemRes] = await Promise.all([
         fetch('/api/artifacts'),
         fetch('/api/sources'),
         fetch('/api/gemini/status'),
       ]);
 
-      if (artRes.ok) {
+      let activeList = getInitialRecords();
+
+      if (isJsonResponse(artRes)) {
         const artData = await artRes.json();
         if (Array.isArray(artData.hoSoHienVat)) {
-          setRecords(artData.hoSoHienVat);
+          activeList = artData.hoSoHienVat;
+          setRecords(activeList);
         }
       }
-      if (srcRes.ok) {
+      if (isJsonResponse(srcRes)) {
         const srcData = await srcRes.json();
         if (srcData && Array.isArray(srcData.nguonTuLieu)) {
           setSourcesStore(srcData);
         }
       }
-      if (gemRes.ok) {
+      if (isJsonResponse(gemRes)) {
         const gemData = await gemRes.json();
         setGeminiStatus(gemData);
+      } else {
+        setGeminiStatus(computeStaticGeminiStatus(activeList));
       }
     } catch {
-      setLoadError(
-        'Không thể tải dữ liệu từ máy chủ cục bộ. Đang hiển thị khung 15 hồ sơ rỗng mặc định.'
-      );
+      // On static deployments (e.g. Vercel without Express backend),
+      // seamlessly rely on bundled hienvat.json / sources.json + localStorage
+      setGeminiStatus(computeStaticGeminiStatus(getInitialRecords()));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const refreshGeminiStatus = useCallback(async () => {
-    try {
-      const res = await fetch('/api/gemini/status');
-      if (res.ok) {
-        setGeminiStatus(await res.json());
+  const refreshGeminiStatus = useCallback(
+    async (latestRecords?: ArtifactRecord[]) => {
+      try {
+        const res = await fetch('/api/gemini/status');
+        if (isJsonResponse(res)) {
+          setGeminiStatus(await res.json());
+          return;
+        }
+      } catch {
+        // Fallback to static status calculation
       }
-    } catch {
-      // Ignore transient status refresh error
-    }
-  }, []);
+      setGeminiStatus(computeStaticGeminiStatus(latestRecords ?? records));
+    },
+    [records]
+  );
 
   useEffect(() => {
     fetchAllData();
@@ -185,51 +232,101 @@ export default function App() {
   };
 
   const handleSaveSingleRecord = async (updated: ArtifactRecord) => {
-    const res = await fetch(`/api/artifacts/${updated.maHoSo}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-    if (!res.ok) throw new Error('Save failed');
-    const data = await res.json();
-    if (Array.isArray(data.hoSoHienVat)) {
-      setRecords(data.hoSoHienVat);
+    const nextLocal = records.map((r) =>
+      r.maHoSo === updated.maHoSo
+        ? {
+            ...updated,
+            ngayCapNhat: new Date().toISOString().slice(0, 10),
+          }
+        : r
+    );
+    try {
+      const res = await fetch(`/api/artifacts/${updated.maHoSo}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      if (isJsonResponse(res)) {
+        const data = await res.json();
+        if (Array.isArray(data.hoSoHienVat)) {
+          setRecords(data.hoSoHienVat);
+          localStorage.removeItem(STORAGE_ARTIFACTS_KEY);
+          await refreshGeminiStatus(data.hoSoHienVat);
+          return;
+        }
+      }
+    } catch {
+      // Static host fallback below
     }
-    await refreshGeminiStatus();
+    localStorage.setItem(STORAGE_ARTIFACTS_KEY, JSON.stringify(nextLocal));
+    setRecords(nextLocal);
+    await refreshGeminiStatus(nextLocal);
   };
 
   const handleReplaceAllRecords = async (nextRecords: ArtifactRecord[]) => {
-    const res = await fetch('/api/artifacts', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hoSoHienVat: nextRecords }),
-    });
-    if (!res.ok) throw new Error('Bulk save failed');
-    const data = await res.json();
-    if (Array.isArray(data.hoSoHienVat)) {
-      setRecords(data.hoSoHienVat);
+    try {
+      const res = await fetch('/api/artifacts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hoSoHienVat: nextRecords }),
+      });
+      if (isJsonResponse(res)) {
+        const data = await res.json();
+        if (Array.isArray(data.hoSoHienVat)) {
+          setRecords(data.hoSoHienVat);
+          localStorage.removeItem(STORAGE_ARTIFACTS_KEY);
+          await refreshGeminiStatus(data.hoSoHienVat);
+          return;
+        }
+      }
+    } catch {
+      // Static host fallback below
     }
-    await refreshGeminiStatus();
+    localStorage.setItem(STORAGE_ARTIFACTS_KEY, JSON.stringify(nextRecords));
+    setRecords(nextRecords);
+    await refreshGeminiStatus(nextRecords);
   };
 
   const handleResetEmptyRecords = async () => {
-    const res = await fetch('/api/artifacts/reset', { method: 'POST' });
-    if (!res.ok) throw new Error('Reset failed');
-    const data = await res.json();
-    if (Array.isArray(data.hoSoHienVat)) {
-      setRecords(data.hoSoHienVat);
+    const empty = createInitial15Records();
+    try {
+      const res = await fetch('/api/artifacts/reset', { method: 'POST' });
+      if (isJsonResponse(res)) {
+        const data = await res.json();
+        if (Array.isArray(data.hoSoHienVat)) {
+          setRecords(data.hoSoHienVat);
+          localStorage.removeItem(STORAGE_ARTIFACTS_KEY);
+          await refreshGeminiStatus(data.hoSoHienVat);
+          return;
+        }
+      }
+    } catch {
+      // Static host fallback below
     }
-    await refreshGeminiStatus();
+    localStorage.setItem(STORAGE_ARTIFACTS_KEY, JSON.stringify(empty));
+    setRecords(empty);
+    await refreshGeminiStatus(empty);
   };
 
   const handleSaveSourcesStore = async (next: ArchiveMetadataStore) => {
-    const res = await fetch('/api/sources', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(next),
-    });
-    if (!res.ok) throw new Error('Save sources failed');
-    setSourcesStore(await res.json());
+    try {
+      const res = await fetch('/api/sources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      if (isJsonResponse(res)) {
+        const saved = await res.json();
+        setSourcesStore(saved);
+        localStorage.removeItem(STORAGE_SOURCES_KEY);
+        await refreshGeminiStatus();
+        return;
+      }
+    } catch {
+      // Static host fallback below
+    }
+    localStorage.setItem(STORAGE_SOURCES_KEY, JSON.stringify(next));
+    setSourcesStore(next);
     await refreshGeminiStatus();
   };
 
@@ -238,14 +335,6 @@ export default function App() {
       <TopBar currentScreen={currentScreen} onNavigate={(s) => navigate(s)} />
 
       <main className="flex-1">
-        {loadError && (
-          <div className="mx-auto mt-4 max-w-[1280px] px-4 sm:px-6 lg:px-8">
-            <div className="border border-[#DDD6C8] bg-[#F4F0E8] px-4 py-2.5 text-xs text-[#57534E]">
-              {loadError}
-            </div>
-          </div>
-        )}
-
         {loading ? (
           <div className="mx-auto max-w-[1280px] px-4 py-16 text-center text-sm text-[#57534E]">
             Đang tải cấu trúc hồ sơ số BẢO TÀNG LS...
